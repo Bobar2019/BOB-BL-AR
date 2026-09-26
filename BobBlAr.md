@@ -338,42 +338,69 @@ La connexion à un réseau suit la même logique : handler → machine à états
 |---|---|
 | Nom Bluetooth | « BOB BL AR » par défaut — **personnalisable** depuis l'interface web (§7.3), NVS |
 | Apparence GAP | 0x03C4 (HID Gamepad → icône manette côté hôte) |
-| VID/PID | 0x1209 / 0xB0B1 (vendor-assigned, pid.codes) |
+| VID/PID | **0x045E / 0x02FD — identité Xbox One S (1708) de Microsoft** |
+| Manufacturer / serial | « Microsoft » / capture d'une manette réelle (0x2A25) |
 | Appairage | **Just Works** + bonding + Secure Connections (accepté macOS/Windows) |
 | Services | HID (0x1812), Battery (0x180F, annoncé 100 %), Device Information |
-| Rapport d'entrée | **5 octets**, notification GATT, Report Reference n°1 |
-| Rapport de sortie | **4 octets** « dual-rumble », Report Reference n°1 — canal de commande de la tare (§7.4) |
+| Rapport d'entrée | **16 octets « Xbox »**, notification GATT, Report Reference n°1 |
+| Rapport de sortie | **8 octets « Set Effect » (page PID)**, Report Reference n°3 — canal de commande de la tare (§7.4) |
+
+L'identité Xbox est **délibérée** : les piles manette des OS (GCController
+haptics sur macOS 14+, pilote Xbox sur Windows 10+, hid-microsoft sur Linux)
+ne lient leur pilote haptique natif — et Chrome n'instancie
+`gamepad.vibrationActuator` — qu'aux manettes Xbox reconnues. C'est ce qui
+rend la manette « standard » (`mapping: "standard"`) avec vibreur natif
+dans le navigateur, sans WebHID ni HTTPS (détails et sources :
+docs/TARE_FORCE_FEEDBACK.md §1.3).
 
 ### 7.2 Rapport HID
 
+Rapport d'entrée n°1 (16 octets, layout fil Xbox) :
+
+| Octets | Champ | Contenu |
+|---|---|---|
+| 0-1 | `x` | stick gauche X — roulis (u16, 0x8000 = centré) |
+| 2-3 | `y` | stick gauche Y — tangage |
+| 4-5 | `z` | stick droit X — lacet |
+| 6-7 | `rz` | stick droit Y — réservé (maintenu centré) |
+| 8-9 / 10-11 | `brake` / `accelerator` | gâchettes gauche/droite (0 = relâchées) |
+| 12 | `hat` | D-pad 4 bits (0 = neutre) |
+| 13-14 | `buttons` | bit 0 = **A (jerk)**, bit 1 = B, bit 3 = X, bit 4 = Y, … |
+| 15 | `share` | bouton Share (0) |
+
+Deux rapports annexes sont déclarés et jamais notifiés (exigés par le
+protocole Xbox 1708) : AC Home (n°2) et batterie (n°4).
+
+Le rapport n'est émis **qu'au changement** (comparaison octet à octet) et au
+plus toutes les 15 ms — sauf rafale périodique pendant les 2 s suivant une
+connexion (certains hôtes ne matérialisent la manette qu'après un premier
+rapport) → économie de radio et de pile hôte.
+
+**Rapport de sortie n°3** (hôte → manette, Report Reference type Output,
+8 octets, « Set Effect Report » page PID) :
+
 | Octet | Champ | Contenu |
 |---|---|---|
-| 0 | `x1` | Joystick 1 X — roulis (int8, −127..+127) |
-| 1 | `y1` | Joystick 1 Y — tangage |
-| 2 | `z2` | Joystick 2 Z — lacet |
-| 3 | `rz2` | Joystick 2 Rz — réservé (0) |
-| 4 | `buttons` | bit0 = Bouton 1 (jerk), bit1 = libre |
+| 0 | `dcEnableActuators` | actionneurs activés (4 bits) |
+| 1-2 | `left/rightTriggerMagnitude` | moteurs de gâchettes (u8, 0..100) |
+| 3 | `weakMagnitude` | moteur faible (u8, 0..100) — non nul = ordre de **Tare** |
+| 4 | `strongMagnitude` | moteur fort (u8, 0..100) — non nul = ordre de **Tare** |
+| 5-7 | `duration` / `startDelay` / `loopCount` | durée/délai en unités de 10 ms, répétitions (informative) |
 
-Le rapport n'est émis **qu'au changement** (comparaison octet à octet) et au plus
-toutes les 15 ms → économie de radio et de pile hôte.
-
-**Rapport de sortie** (hôte → manette, Report Reference n°1, type Output) :
-
-| Octet | Champ | Contenu |
-|---|---|---|
-| 0 | `strongMagnitude` | moteur fort (u8) — non nul = ordre de **Tare** |
-| 1 | `weakMagnitude` | moteur faible (u8) — non nul = ordre de **Tare** |
-| 2-3 | `duration` | durée de l'effet (ms, u16 little endian, informative) |
-
-La manette ne possédant pas de moteurs, toute magnitude non nulle est interprétée
-comme un ordre de tare (anti-rebond 250 ms ; formats avec ou sans octet de
-Report ID acceptés selon la pile hôte).
+La manette ne possédant pas de moteurs, toute magnitude non nulle (moteurs
+ou gâchettes) est interprétée comme un ordre de tare (anti-rebond 250 ms ;
+formats avec ou sans octet de Report ID acceptés selon la pile hôte).
 
 ### 7.3 Appairage
 
 Réglages Bluetooth de macOS/Windows → « Ajouter un appareil » → nom de la manette
-(par défaut **BOB BL AR**). La manette apparaît comme une manette de jeu générique.
+(par défaut **BOB BL AR**). Grâce à l'identité PnP Xbox (0x045E:0x02FD) et au
+descripteur du protocole Xbox, la manette apparaît côté hôte comme une **manette
+Xbox** — pilote haptique natif lié, `vibrationActuator` disponible dans Chrome.
 Le bonding est mémorisé : la reconnexion est automatique quand la carte s'allume.
+
+**Important** : lors du passage au profil Xbox, supprimer d'abord l'ancien
+appairage sur l'hôte (identité et descripteur ont changé) puis ré-appairer.
 
 **Renommage** : la carte « État Bluetooth » de l'interface web permet de changer le
 nom (1 à 28 octets, persisté en NVS, appliqué à chaud — caractéristique GAP
@@ -382,15 +409,16 @@ conserver l'ancien nom en cache : supprimer puis ré-appairer la manette sur l'h
 
 ### 7.4 Tare par retour de force (Output Report HID)
 
-Le canal natif **hôte → manette** du profil HID (Output Report, celui du rumble
-sur les manettes du commerce) permet de commander la tare **sans Wi-Fi** —
-crucial sur l'ESP32-C6 dont la radio unique est partagée Wi-Fi/BLE. L'ordre est
-émis par l'hôte via la Web Gamepad API (`playEffect('dual-rumble', …)`), WebHID
-(`sendReport(1, …)`) ou hidapi (`write`), décodé par `BleGamepadHid`
-(`OutputCallbacks::onWrite`), puis **différé** vers la tâche manette 100 Hz qui
-exécute la tare + NVS (jamais dans le contexte NimBLE, pile limitée). Les deux
-canaux — REST `/api/gamepad/tare` et Output Report — convergent vers
-`HeadTracker::tare()`.
+Le canal natif **hôte → manette** du profil HID (Output Report n°3 « Set
+Effect », celui du rumble sur les manettes Xbox) permet de commander la
+tare **sans Wi-Fi** — crucial sur l'ESP32-C6 dont la radio unique est
+partagée Wi-Fi/BLE. L'ordre est émis par l'hôte via la Web Gamepad API
+(`playEffect('dual-rumble', …)` — natif, sans WebHID ni HTTPS), WebHID
+(`sendReport(3, …)`) ou hidapi (`write`), décodé par `BleGamepadHid`
+(`OutputCallbacks::onWrite`), puis **différé** vers la tâche manette 100 Hz
+qui exécute la tare + NVS (jamais dans le contexte NimBLE, pile limitée).
+Les deux canaux — REST `/api/gamepad/tare` et Output Report — convergent
+vers `HeadTracker::tare()`.
 
 Détails complets (structure du paquet, exemples JavaScript/Python, validation) :
 **[docs/TARE_FORCE_FEEDBACK.md](docs/TARE_FORCE_FEEDBACK.md)**.

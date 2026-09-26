@@ -181,6 +181,16 @@ float HeadTracker::_mapAngle(float angleDeg, float deadzoneDeg, float fullDeflec
 }
 
 /* ------------------------------------------------------------------ */
+/* Conversion d'axe : ±127 (échelle interne du socle) → u16 « Xbox »,   */
+/* 0x8000 = centré, pleine butée à ±32767 autour du centre.            */
+/* ------------------------------------------------------------------ */
+
+static uint16_t axisToXboxU16(float v) {
+    const float c = constrain(v, -127.0f, 127.0f);
+    return (uint16_t)(32768 + (int32_t)lroundf(c * (32767.0f / 127.0f)));
+}
+
+/* ------------------------------------------------------------------ */
 /* Tâche temps réel 100 Hz                                             */
 /* ------------------------------------------------------------------ */
 
@@ -196,8 +206,9 @@ void HeadTracker::_taskLoop() {
     float gyroDps[3] = {0, 0, 0};
     float magUt[3] = {0, 0, 0};
 
-    HidGamepadReport lastSent = {0, 0, 0, 0, 0};
+    HidGamepadReport lastSent = {};   /* zéros ≠ neutre (0x8000) : 1er rapport garanti */
     uint32_t lastSendMs = 0;
+    uint32_t connectedAtMs = 0;       /* début de connexion : période de grâce d'émission */
     bool bleConnectedLatch = false;
 
     for (;;) {
@@ -286,24 +297,34 @@ void HeadTracker::_taskLoop() {
         if (_settings.invertZ) j2z = -j2z;
 
         HidGamepadReport rep;
-        rep.x1 = (int8_t)lroundf(constrain(j1x, -127.0f, 127.0f));
-        rep.y1 = (int8_t)lroundf(constrain(j1y, -127.0f, 127.0f));
-        rep.z2 = (int8_t)lroundf(constrain(j2z, -127.0f, 127.0f));
-        rep.rz2 = 0;
-        rep.buttons = _btnActive ? 0x01 : 0x00;
+        rep.x = axisToXboxU16(j1x);      /* roulis  → stick gauche X */
+        rep.y = axisToXboxU16(j1y);      /* tangage → stick gauche Y */
+        rep.z = axisToXboxU16(j2z);      /* lacet   → stick droit X  */
+        rep.rz = XBOX_AXIS_CENTER;       /* réservé : centré (0 = butée basse !) */
+        rep.brake = 0;                   /* gâchettes relâchées */
+        rep.accelerator = 0;
+        rep.hat = 0;                     /* D-pad neutre */
+        rep.buttons = _btnActive ? XBOX_BTN_A : 0x0000;   /* jerk → bouton A */
+        rep.share = 0;
 
-        /* 5. Rapport BLE HID : uniquement au changement, débit limité */
+        /* 5. Rapport BLE HID : au changement, ou en rafale périodique
+              pendant les 2 s qui suivent la connexion (l'abonnement CCCD
+              de l'hôte peut être postérieur au premier rapport ; sans
+              activité, certains hôtes ne matérialisent pas la manette
+              dans navigator.getGamepads()), débit limité. */
         const bool bleConnected = g_bleGamepad.isConnected();
+        if (bleConnected != bleConnectedLatch) {
+            bleConnectedLatch = bleConnected;
+            if (bleConnected) connectedAtMs = nowMs;
+            Serial.println(bleConnected ? "[TRACK] Diffusion HID active" : "[TRACK] Diffusion HID suspendue");
+        }
+        const bool grace = bleConnected && (nowMs - connectedAtMs) < 2000;
         if (bleConnected &&
-            (memcmp(&rep, &lastSent, sizeof(rep)) != 0) &&
-            (nowMs - lastSendMs) >= BLE_SEND_MIN_INTERVAL_MS) {
+            (grace || (memcmp(&rep, &lastSent, sizeof(rep)) != 0)) &&
+            (nowMs - lastSendMs) >= (grace ? 250 : BLE_SEND_MIN_INTERVAL_MS)) {
             g_bleGamepad.sendReport(rep);
             lastSent = rep;
             lastSendMs = nowMs;
-        }
-        if (bleConnected != bleConnectedLatch) {
-            bleConnectedLatch = bleConnected;
-            Serial.println(bleConnected ? "[TRACK] Diffusion HID active" : "[TRACK] Diffusion HID suspendue");
         }
 
         /* 6. Instantané télémétrie (consommé par le WebSocket à 10 Hz) */

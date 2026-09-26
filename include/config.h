@@ -61,13 +61,26 @@ constexpr uint16_t TELEMETRY_PERIOD_MS = 100; /* 10 Hz */
 /** @brief Nom Bluetooth visible par macOS / Windows lors de l'appairage */
 constexpr const char* BLE_DEVICE_NAME = "BOB BL AR";
 
-/** @brief Fabricant annoncé dans le service Device Information (0x2A29) */
-constexpr const char* BLE_MANUFACTURER = "BOB";
+/** @brief Fabricant annoncé dans le service Device Information (0x2A29) —
+ *         partie de l'identité « manette Xbox » (cf. BLE_VID). */
+constexpr const char* BLE_MANUFACTURER = "Microsoft";
 
-/** @brief VID/PNP « vendor-assigned » (0x02) — pid.codes, usage communautaire */
-constexpr uint16_t BLE_VID = 0x1209;
-constexpr uint16_t BLE_PID = 0xB0B1;
+/** @brief VID/PID « vendor-assigned » (0x02) — identité **Xbox One S (1708)**
+ *         de Microsoft : les piles manette des OS ne lient leur pilote
+ *         haptique natif — et Chrome n'expose gamepad.vibrationActuator —
+ *         qu'aux manettes Xbox reconnues (GCController haptics sur macOS 14+,
+ *         pilote Xbox sur Windows 10+, hid-microsoft sur Linux). Un VID/PID
+ *         communautaire (pid.codes) laisse la manette « générique » :
+ *         axes lisibles, mais TARE INDISPONIBLE côté navigateur.
+ *         NE PAS modifier sans relire docs/TARE_FORCE_FEEDBACK.md §1.3. */
+constexpr uint16_t BLE_VID = 0x045E;
+constexpr uint16_t BLE_PID = 0x02FD;
 constexpr uint16_t BLE_VERSION = 0x0100;
+
+/** @brief Numéro de série (0x2A25) — capture ASCII d'une manette One S
+ *         réelle (Mystfit/ESP32-BLE-CompositeHID) : le pilote Xbox de
+ *         l'hôte s'en sert pour le matching. */
+constexpr const char* BLE_SERIAL_NUMBER = "3033363030343037323136373239";
 
 /** @brief Apparence GAP : HID Gamepad (0x03C4) — icône manette côté hôte */
 constexpr uint16_t BLE_APPEARANCE_GAMEPAD = 0x03C4;
@@ -75,8 +88,12 @@ constexpr uint16_t BLE_APPEARANCE_GAMEPAD = 0x03C4;
 /** @brief Niveau de batterie annoncé (service 0x180F) — pas de mesure réelle */
 constexpr uint8_t BLE_BATTERY_LEVEL = 100;
 
-/** @brief Identifiant du rapport HID envoyé en notification */
+/** @brief Identifiant du rapport d'entrée HID (16 octets, layout Xbox) */
 constexpr uint8_t GAMEPAD_REPORT_ID = 0x01;
+
+/** @brief Identifiant de l'Output Report de rumble « Set Effect » (8 octets,
+ *         page d'usages PID 0x0F) — canal hôte → manette de la tare. */
+constexpr uint8_t GAMEPAD_RUMBLE_REPORT_ID = 0x03;
 
 /** @brief Intervalle minimum entre deux notifications HID (ms) — ~66 Hz max */
 constexpr uint16_t BLE_SEND_MIN_INTERVAL_MS = 15;
