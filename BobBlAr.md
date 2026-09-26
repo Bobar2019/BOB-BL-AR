@@ -48,7 +48,9 @@ ordinateur sans rien installer.
 
 Chaque axe possède ses propres **zone morte**, **sensibilité** et **sens** (inversion).
 Un bouton « **tare** » recentre le point 0 : la position actuelle de la tête devient
-le neutre. Tous les réglages sont persistés en NVS (survivent aux redémarrages).
+le neutre — déclenchable depuis l'interface web **ou** par un ordre de vibration
+envoyé par l'hôte de jeu (HID Output Report, sans Wi-Fi, §7.4). Tous les réglages
+sont persistés en NVS (survivent aux redémarrages).
 
 ### 1.2 Caractéristiques principales
 
@@ -56,6 +58,8 @@ le neutre. Tous les réglages sont persistés en NVS (survivent aux redémarrage
 - **Latence BLE** : rapports envoyés uniquement au changement, débit limité à ~66 Hz
 - **Interface web** : SPA par tuiles (dashboard), thème clair/sombre, télémétrie temps
   réel WebSocket, ordre des tuiles personnalisable par glisser-déposer
+- **Nom Bluetooth personnalisable** depuis l'interface web (persisté en NVS, sans
+  reflash) — annoncé dès le scan, avant appairage
 - **Réseau** : point d'accès autonome **« BOB BL AR »** + connexion optionnelle à une
   box (mode AP+STA simultané) avec portail captif multi-OS
 - **Consommation firmware** : ~48 Ko de RAM (15 %), ~1,5 Mo de flash (18 % sur 8 Mo)
@@ -143,8 +147,10 @@ BOBBLAR/
 │   ├── main.cpp              # Séquence d'initialisation
 │   ├── imu_mpu9250.cpp       # Lecture capteur, calibrage gyro, scan bus
 │   ├── head_tracker.cpp      # Tâche temps réel + NVS + tare
-│   ├── ble_gamepad.cpp       # Services HID, advertising, appairage
+│   ├── ble_gamepad.cpp       # Services HID, advertising, appairage, renommage
 │   └── web_server.cpp        # Routes REST, WebSocket, portail captif, scan/connexion
+├── docs/                     # Documentation complémentaire
+│   └── TARE_FORCE_FEEDBACK.md # Tare par Output Report HID (rumble hôte → manette)
 └── data/                     # → LittleFS (interface web)
     ├── index.html            # SPA par tuiles
     ├── style.css             # Design system complet (tokens, responsive)
@@ -169,7 +175,7 @@ BOBBLAR/
 
 | Tâche | Priorité | Pile | Rôle | Période |
 |---|---|---|---|---|
-| **Gamepad** | 4 | 6144 o | I2C → Mahony → mapping → rapport HID | 10 ms (100 Hz) |
+| **Gamepad** | 4 | 8192 o | I2C → Mahony → mapping → rapport HID + tare (NVS) | 10 ms (100 Hz) |
 | **WebServer** | 1 | 8192 o | DNS captif, machines à états Wi-Fi, télémétrie WS | 20 ms (50 Hz) |
 | **async_tcp** | (lib) | 8192 o | handlers HTTP/WebSocket de la pile asynchrone | événementiel |
 | loop() | 1 | — | vide (toute la logique est dans les tâches) | — |
@@ -261,7 +267,8 @@ Pour chaque axe, avec zone morte `dz` et pleine déviation `fd` **propres à l'a
 - **Dashboard par tuiles** (tuile Manette, tuile Wi-Fi, tuile Système) — ordre
   personnalisable par glisser-déposer (appui long 500 ms, persisté en localStorage)
 - **Section Manette** : angles en direct, joysticks visualisés (pastilles),
-  barre d'accélération + seuil jerk, LED Bouton 1, formulaires de réglages + tare
+  barre d'accélération + seuil jerk, LED Bouton 1, formulaires de réglages + tare,
+  renommage Bluetooth (NVS)
 - **Section Wi-Fi** : scan des réseaux, connexion avec mot de passe (persisté)
 - **Section Système** : version, uptime, heap, état BLE/IMU, redémarrage
 - **Thème** clair/sombre persisté ; responsive (points de rupture 768/480 px)
@@ -329,12 +336,13 @@ La connexion à un réseau suit la même logique : handler → machine à états
 
 | Élément | Valeur |
 |---|---|
-| Nom Bluetooth | « BOB BL AR » |
+| Nom Bluetooth | « BOB BL AR » par défaut — **personnalisable** depuis l'interface web (§7.3), NVS |
 | Apparence GAP | 0x03C4 (HID Gamepad → icône manette côté hôte) |
 | VID/PID | 0x1209 / 0xB0B1 (vendor-assigned, pid.codes) |
 | Appairage | **Just Works** + bonding + Secure Connections (accepté macOS/Windows) |
 | Services | HID (0x1812), Battery (0x180F, annoncé 100 %), Device Information |
 | Rapport d'entrée | **5 octets**, notification GATT, Report Reference n°1 |
+| Rapport de sortie | **4 octets** « dual-rumble », Report Reference n°1 — canal de commande de la tare (§7.4) |
 
 ### 7.2 Rapport HID
 
@@ -349,17 +357,49 @@ La connexion à un réseau suit la même logique : handler → machine à états
 Le rapport n'est émis **qu'au changement** (comparaison octet à octet) et au plus
 toutes les 15 ms → économie de radio et de pile hôte.
 
+**Rapport de sortie** (hôte → manette, Report Reference n°1, type Output) :
+
+| Octet | Champ | Contenu |
+|---|---|---|
+| 0 | `strongMagnitude` | moteur fort (u8) — non nul = ordre de **Tare** |
+| 1 | `weakMagnitude` | moteur faible (u8) — non nul = ordre de **Tare** |
+| 2-3 | `duration` | durée de l'effet (ms, u16 little endian, informative) |
+
+La manette ne possédant pas de moteurs, toute magnitude non nulle est interprétée
+comme un ordre de tare (anti-rebond 250 ms ; formats avec ou sans octet de
+Report ID acceptés selon la pile hôte).
+
 ### 7.3 Appairage
 
-Réglages Bluetooth de macOS/Windows → « Ajouter un appareil » → **BOB BL AR**.
-La manette apparaît comme une manette de jeu générique. Le bonding est mémorisé :
-la reconnexion est automatique quand la carte s'allume.
+Réglages Bluetooth de macOS/Windows → « Ajouter un appareil » → nom de la manette
+(par défaut **BOB BL AR**). La manette apparaît comme une manette de jeu générique.
+Le bonding est mémorisé : la reconnexion est automatique quand la carte s'allume.
+
+**Renommage** : la carte « État Bluetooth » de l'interface web permet de changer le
+nom (1 à 28 octets, persisté en NVS, appliqué à chaud — caractéristique GAP
+Device Name + scan response, advertising relancé). Un hôte déjà appairé peut
+conserver l'ancien nom en cache : supprimer puis ré-appairer la manette sur l'hôte.
+
+### 7.4 Tare par retour de force (Output Report HID)
+
+Le canal natif **hôte → manette** du profil HID (Output Report, celui du rumble
+sur les manettes du commerce) permet de commander la tare **sans Wi-Fi** —
+crucial sur l'ESP32-C6 dont la radio unique est partagée Wi-Fi/BLE. L'ordre est
+émis par l'hôte via la Web Gamepad API (`playEffect('dual-rumble', …)`), WebHID
+(`sendReport(1, …)`) ou hidapi (`write`), décodé par `BleGamepadHid`
+(`OutputCallbacks::onWrite`), puis **différé** vers la tâche manette 100 Hz qui
+exécute la tare + NVS (jamais dans le contexte NimBLE, pile limitée). Les deux
+canaux — REST `/api/gamepad/tare` et Output Report — convergent vers
+`HeadTracker::tare()`.
+
+Détails complets (structure du paquet, exemples JavaScript/Python, validation) :
+**[docs/TARE_FORCE_FEEDBACK.md](docs/TARE_FORCE_FEEDBACK.md)**.
 
 ---
 
 ## 8. Persistance NVS
 
-Deux espaces (`Preferences`) :
+Trois espaces (`Preferences`) :
 
 | Namespace | Clés | Contenu |
 |---|---|---|
@@ -369,6 +409,7 @@ Deux espaces (`Preferences`) :
 | | `inv` | bitmap inversions X/Y/Z |
 | | `tarP` `tarR` `tarY` | offsets de tare (°) |
 | `wifi` | `ssid` `pass` | identifiants du réseau mémorisé |
+| `ble` | `name` | nom Bluetooth personnalisé (défaut « BOB BL AR ») |
 
 Chaque écriture est **vérifiée par relecture** (convention du socle) — l'API REST
 retourne une erreur si la NVS n'a pas confirmé. Les réglages sont bornés à deux
@@ -394,9 +435,11 @@ Toutes les routes répondent en JSON. Les POST acceptent
 | GET | `/api/gamepad/config` | — | tous les réglages courants |
 | POST | `/api/gamepad/config` | `dzPitch` `dzRoll` `dzYaw` `fullDeflectPitch` `fullDeflectRoll` `fullDeflectYaw` `jerkThresh` `jerkCooldown` `invX` `invY` `invZ` (champ absent = valeur conservée) | réglages normalisés, ou 400 avec message |
 | POST | `/api/gamepad/tare` | — | recentre le point 0 |
+| GET | `/api/ble/name` | — | `{name:"…"}` — nom Bluetooth courant |
+| POST | `/api/ble/name` | `name` | renomme la manette — NVS + application à chaud, ou 400 |
 
 Bornes de validation : zones mortes 0-45° · sensibilités 10-90° · seuil jerk
-3-60 m/s² · recharge 100-3000 ms.
+3-60 m/s² · recharge 100-3000 ms · nom Bluetooth 1-28 octets (trim appliqué).
 
 ---
 
@@ -493,6 +536,7 @@ Tous les points suivants ont été rencontrés réellement sur ce projet.
 | Upload impossible (port occupé) | moniteur série ouvert | fermer le moniteur, relancer l'upload |
 | Portail captif qui ne s'ouvre pas | téléphone déjà connecté à l'AP | Wi-Fi off/on ou oublier le réseau puis se reconnecter |
 | Lacet qui dérive lentement | dérive gyroscopique normale (Mahony 6 axes) | « Recalibrer (tare) » — ou évoluer vers Mahony 9 axes (§14) |
+| L'hôte affiche l'ancien nom après un renommage | nom mis en cache avec le bonding | supprimer puis ré-appairer la manette sur l'hôte (§7.3) |
 
 ---
 

@@ -74,6 +74,19 @@ public:
      */
     void setRumbleHandler(RumbleHandler handler) { _rumbleHandler = handler; }
 
+    /** @brief Nom Bluetooth courant (NVS « ble »/name, défaut BLE_DEVICE_NAME). */
+    String deviceName() const { return _deviceName; }
+
+    /**
+     * @brief Renomme la manette : persiste en NVS puis applique à chaud.
+     *
+     * Validation : 1 à BLE_NAME_MAX_LEN octets (après trim). Application :
+     * caractéristique GAP Device Name (0x2A00) + payload d'advertising
+     * (scan response), advertising relancé si aucun hôte n'est connecté.
+     * @return true si la NVS est confirmée par relecture.
+     */
+    bool setDeviceName(const String& name);
+
     /** @brief Met à jour le niveau de batterie annoncé. */
     void setBatteryLevel(uint8_t percent);
 
@@ -105,6 +118,11 @@ private:
     RumbleHandler        _rumbleHandler = nullptr;
     uint32_t             _lastRumbleMs = 0;       /* anti-rebond des ordres */
     volatile bool        _connected = false;
+
+    /** @brief Charge le nom Bluetooth depuis la NVS (défaut : constante). */
+    void _loadDeviceName();
+
+    String                _deviceName;            /* nom d'appairage courant */
 };
 
 /** @brief Instance globale de la manette (définie dans ble_gamepad.cpp) */

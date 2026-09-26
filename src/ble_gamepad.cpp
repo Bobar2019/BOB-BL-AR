@@ -1,5 +1,6 @@
 #include "ble_gamepad.h"
 #include "config.h"
+#include <Preferences.h>
 
 BleGamepadHid g_bleGamepad;
 
@@ -119,8 +120,24 @@ void BleGamepadHid::OutputCallbacks::onWrite(NimBLECharacteristic* pCharacterist
 /* Initialisation                                                      */
 /* ------------------------------------------------------------------ */
 
+/* Nom Bluetooth : NVS « ble »/« name », repli sur la constante. La clé
+   n'existe pas au premier flash — Preferences renvoie alors le défaut. */
+void BleGamepadHid::_loadDeviceName() {
+    Preferences prefs;
+    if (prefs.begin("ble", true)) {
+        _deviceName = prefs.getString("name", BLE_DEVICE_NAME);
+        prefs.end();
+    } else {
+        _deviceName = BLE_DEVICE_NAME;
+    }
+    if (_deviceName.length() < 1 || _deviceName.length() > BLE_NAME_MAX_LEN) {
+        _deviceName = BLE_DEVICE_NAME;   /* valeur corrompue → défaut */
+    }
+}
+
 bool BleGamepadHid::begin() {
-    NimBLEDevice::init(BLE_DEVICE_NAME);
+    _loadDeviceName();
+    NimBLEDevice::init(_deviceName.c_str());
 
     /* Appairage « Just Works » : bonding obligatoire (HID), pas de MITM
        (pas d'écran/clavier sur la manette), Secure Connections activé. */
@@ -148,14 +165,16 @@ bool BleGamepadHid::begin() {
 
     _server->start();   /* démarre HID + Battery + Device Information */
 
-    /* Advertising : service HID + apparence « gamepad » + réponse au scan */
+    /* Advertising : service HID + apparence « gamepad » + nom complet dans
+       la scan response (visible au scan AVANT connexion) + réponse au scan */
     NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
     adv->setAppearance(BLE_APPEARANCE_GAMEPAD);
     adv->addServiceUUID(_hid->getHidService()->getUUID());
+    adv->setName(_deviceName.c_str());
     adv->enableScanResponse(true);
     NimBLEDevice::startAdvertising();
 
-    Serial.println("[BLE] Manette « " + String(BLE_DEVICE_NAME) + " » en advertising");
+    Serial.println("[BLE] Manette « " + _deviceName + " » en advertising");
     return true;
 }
 
@@ -179,4 +198,40 @@ void BleGamepadHid::sendReport(const HidGamepadReport& report) {
 
 void BleGamepadHid::setBatteryLevel(uint8_t percent) {
     if (_hid) _hid->setBatteryLevel(percent);
+}
+
+/* ------------------------------------------------------------------ */
+/* Renommage (interface web → POST /api/ble/name)                       */
+/* ------------------------------------------------------------------ */
+
+bool BleGamepadHid::setDeviceName(const String& name) {
+    String n = name;
+    n.trim();
+    if (n.length() < 1 || n.length() > BLE_NAME_MAX_LEN) return false;
+
+    /* NVS + relecture de confirmation (convention du socle) */
+    Preferences prefs;
+    if (!prefs.begin("ble", false)) return false;
+    prefs.putString("name", n);
+    const bool ok = prefs.getString("name", "") == n;
+    prefs.end();
+    if (!ok) return false;
+
+    _deviceName = n;
+
+    /* Application à chaud : caractéristique GAP Device Name (0x2A00) puis
+       payload d'advertising (scan response). Si un hôte est connecté,
+       l'advertising est inactif — advertiseOnDisconnect le relancera avec
+       la nouvelle payload ; les hôtes déjà appairés peuvent néanmoins
+       conserver l'ancien nom en cache (ré-appairage nécessaire). */
+    NimBLEDevice::setDeviceName(n.c_str());
+    NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
+    adv->setName(n.c_str());
+    if (!_connected) {
+        adv->stop();
+        adv->start();
+    }
+
+    Serial.println("[BLE] Manette renommée « " + n + " »");
+    return true;
 }

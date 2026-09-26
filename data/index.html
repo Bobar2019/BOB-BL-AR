@@ -122,9 +122,20 @@
                     <span class="info-value" id="ble-clients">0</span>
                 </div>
             </div>
-            <p class="hint">Appairez « BOB BL AR » dans Réglages Système → Bluetooth (macOS)
+            <div class="settings-grid">
+                <label>Nom Bluetooth (appairage)
+                    <input type="text" id="in-ble-name" maxlength="28" autocomplete="off" spellcheck="false">
+                </label>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" id="btn-ble-save" type="button">Renommer (NVS)</button>
+            </div>
+            <div class="form-status" id="ble-status" role="status"></div>
+            <p class="hint">Appairez la manette dans Réglages Système → Bluetooth (macOS)
             ou Périphériques → Bluetooth (Windows). Aucun code requis : appairage sécurisé
-            « Just Works » avec mémorisation (bonding).</p>
+            « Just Works » avec mémorisation (bonding). Après un renommage, un hôte déjà
+            appairé peut conserver l'ancien nom en cache : supprimez puis ré-appairez la
+            manette sur l'hôte si l'ancien nom reste affiché.</p>
         </div>
 
         <div class="card">

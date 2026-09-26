@@ -54,6 +54,8 @@ private:
     void _handleGamepadConfigGet(AsyncWebServerRequest* request);
     void _handleGamepadConfigPost(AsyncWebServerRequest* request);
     void _handleGamepadTare(AsyncWebServerRequest* request);
+    void _handleBleNameGet(AsyncWebServerRequest* request);
+    void _handleBleNamePost(AsyncWebServerRequest* request);
 
     /* --- WebSocket --- */
     void _onWSEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,

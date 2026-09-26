@@ -160,6 +160,14 @@ void AppWebServer::_setupRoutes() {
         _handleGamepadTare(request);
     });
 
+    /* ===================== API BLUETOOTH ===================== */
+    _server.on("/api/ble/name", HTTP_GET, [this](AsyncWebServerRequest* request) {
+        _handleBleNameGet(request);
+    });
+    _server.on("/api/ble/name", HTTP_POST, [this](AsyncWebServerRequest* request) {
+        _handleBleNamePost(request);
+    });
+
     /* Fichiers statiques : la racine sert index.html depuis LittleFS */
     _server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
 
@@ -227,7 +235,7 @@ void AppWebServer::_handleSystemStatus(AsyncWebServerRequest* request) {
     }
 
     JsonObject ble = doc["ble"].to<JsonObject>();
-    ble["name"] = BLE_DEVICE_NAME;
+    ble["name"] = g_bleGamepad.deviceName();
     ble["connected"] = g_bleGamepad.isConnected();
     ble["clients"] = g_bleGamepad.clientCount();
 
@@ -603,6 +611,39 @@ void AppWebServer::_handleGamepadTare(AsyncWebServerRequest* request) {
     } else {
         request->send(500, "application/json",
                       "{\"error\":\"Ecriture NVS non confirmée\"}");
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* Nom Bluetooth (interface web)                                        */
+/* ------------------------------------------------------------------ */
+
+void AppWebServer::_handleBleNameGet(AsyncWebServerRequest* request) {
+    JsonDocument doc;
+    doc["name"] = g_bleGamepad.deviceName();
+    String response;
+    serializeJson(doc, response);
+    request->send(200, "application/json", response);
+}
+
+void AppWebServer::_handleBleNamePost(AsyncWebServerRequest* request) {
+    if (!request->hasParam("name", true)) {
+        request->send(400, "application/json",
+                      "{\"error\":\"Paramètre 'name' manquant\"}");
+        return;
+    }
+    const String name = request->getParam("name", true)->value();
+    if (g_bleGamepad.setDeviceName(name)) {
+        JsonDocument doc;
+        doc["status"] = "ok";
+        doc["name"] = g_bleGamepad.deviceName();
+        doc["message"] = "Nom Bluetooth enregistré";
+        String response;
+        serializeJson(doc, response);
+        request->send(200, "application/json", response);
+    } else {
+        request->send(400, "application/json",
+                      "{\"error\":\"Nom invalide (1 à 28 octets)\"}");
     }
 }
 

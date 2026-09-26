@@ -85,7 +85,7 @@ function showSection(id) {
     btnBack.style.display = 'flex';
     window.scrollTo(0, 0);
     /* chargement paresseux des données de la section affichée */
-    if (id === 'section-gamepad') loadGamepadConfig();
+    if (id === 'section-gamepad') { loadGamepadConfig(); loadBleName(); }
     if (id === 'section-wifi' && !wifiScannedOnce) scanWifi();
     if (id === 'section-system') startSystemPolling();
     else stopSystemPolling();
@@ -450,6 +450,58 @@ async function tareGamepad() {
 
 $id('btn-gp-save').addEventListener('click', saveGamepadConfig);
 $id('btn-gp-tare').addEventListener('click', tareGamepad);
+
+/* ============================================================
+   API BLUETOOTH — nom du périphérique (NVS)
+   ============================================================ */
+async function loadBleName() {
+    try {
+        const res = await fetch('/api/ble/name');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        $id('in-ble-name').value = data.name;
+        setText($id('ble-name'), data.name);
+    } catch (_) {
+        /* silencieux — nouvelle tentative à la prochaine ouverture */
+    }
+}
+
+async function saveBleName() {
+    const name = $id('in-ble-name').value.trim();
+    if (!name) {
+        setStatus('ble-status', 'Le nom ne peut pas être vide', 'err');
+        return;
+    }
+    const btn = $id('btn-ble-save');
+    btn.disabled = true;
+    setStatus('ble-status', 'Enregistrement…', '');
+    try {
+        const body = new URLSearchParams();
+        body.set('name', name);
+        const res = await fetch('/api/ble/name', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString()
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.status === 'ok') {
+            $id('in-ble-name').value = data.name;   /* valeur normalisée */
+            setText($id('ble-name'), data.name);
+            setStatus('ble-status', (data.message || 'Nom enregistré') + ' ✓', 'ok');
+        } else {
+            setStatus('ble-status', 'Erreur : ' + (data.error || 'inconnue'), 'err');
+        }
+    } catch (_) {
+        setStatus('ble-status', 'Firmware injoignable — réessayez', 'err');
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+$id('btn-ble-save').addEventListener('click', saveBleName);
+$id('in-ble-name').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveBleName();
+});
 
 /* ============================================================
    API WI-FI — scan + connexion STA

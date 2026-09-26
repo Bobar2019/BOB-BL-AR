@@ -81,6 +81,13 @@ constexpr uint8_t GAMEPAD_REPORT_ID = 0x01;
 /** @brief Intervalle minimum entre deux notifications HID (ms) — ~66 Hz max */
 constexpr uint16_t BLE_SEND_MIN_INTERVAL_MS = 15;
 
+/** @brief Longueur maximale du nom Bluetooth personnalisable (octets UTF-8).
+ *         L’entrée « nom complet » de la scan response dispose de 31 − 2
+ *         octets d’en-tête AD ; 28 garde une marge. Le nom est persisté en
+ *         NVS (namespace « ble », clé « name ») et modifiable depuis
+ *         l’interface web (POST /api/ble/name). */
+constexpr uint8_t BLE_NAME_MAX_LEN = 28;
+
 /** @brief Anti-rebond des ordres de rumble reçus sur l'Output Report (ms) —
  *         un effet continu relancé périodiquement par l'hôte ne déclenche
  *         qu'une seule tare par fenêtre (protège la NVS et la trace série). */
