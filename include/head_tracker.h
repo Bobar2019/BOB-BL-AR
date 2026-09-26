@@ -67,6 +67,17 @@ public:
      */
     bool tare();
 
+    /**
+     * @brief Demande une tare depuis un contexte étranger (callback BLE).
+     *
+     * L'appel reste léger (simple drapeau) : la tare complète — copie des
+     * angles bruts dans les offsets et écriture NVS — est exécutée par la
+     * tâche manette 100 Hz, jamais dans le contexte de l'appelant.
+     * Utilisé par le canal de commande rumble (Output Report HID), cf.
+     * docs/TARE_FORCE_FEEDBACK.md.
+     */
+    void requestTare() { _tareRequested = true; }
+
     /** @brief Réglages courants (lecture seule, pour l'API REST). */
     const GamepadSettings& settings() const { return _settings; }
 
@@ -105,6 +116,9 @@ private:
     volatile float _rawPitchDeg = 0.0f;
     volatile float _rawRollDeg = 0.0f;
     volatile float _rawYawDeg = 0.0f;
+
+    /* Tare demandée hors tâche manette (callback BLE : ordre de rumble) */
+    volatile bool _tareRequested = false;
 
     float _tarePitch = 0.0f;
     float _tareRoll = 0.0f;

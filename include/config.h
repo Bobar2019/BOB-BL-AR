@@ -81,6 +81,11 @@ constexpr uint8_t GAMEPAD_REPORT_ID = 0x01;
 /** @brief Intervalle minimum entre deux notifications HID (ms) — ~66 Hz max */
 constexpr uint16_t BLE_SEND_MIN_INTERVAL_MS = 15;
 
+/** @brief Anti-rebond des ordres de rumble reçus sur l'Output Report (ms) —
+ *         un effet continu relancé périodiquement par l'hôte ne déclenche
+ *         qu'une seule tare par fenêtre (protège la NVS et la trace série). */
+constexpr uint16_t BLE_RUMBLE_DEBOUNCE_MS = 250;
+
 /* =========================================================================
  * SECTION 4 : CAPTEUR INERTIEL MPU9250 (I2C)
  * ========================================================================= */
@@ -168,8 +173,12 @@ constexpr float LINACC_DISPLAY_MAX_MS2 = 60.0f;
  * (cœur unique) avec une priorité supérieure à la tâche Web pour garantir
  * la cadence 100 Hz. Sur une cible bicœur (S3), le code re-épingle sur le
  * cœur 1 automatiquement (voir head_tracker.cpp).
+ *
+ * 8192 o : la tâche exécute aussi la tare demandée par l'Output Report HID
+ * (rumble) — écriture NVS complète + relecture, chemin plus profond que la
+ * boucle de mesure seule (cf. docs/TARE_FORCE_FEEDBACK.md § 5.2).
  */
-constexpr uint32_t STACK_SIZE_GAMEPAD = 6144;
+constexpr uint32_t STACK_SIZE_GAMEPAD = 8192;
 constexpr uint8_t PRIORITY_GAMEPAD = 4;
 
 /** @brief Période de la tâche manette (ms) — 10 ms = 100 Hz */

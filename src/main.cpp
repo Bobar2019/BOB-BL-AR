@@ -7,6 +7,25 @@
 #include "head_tracker.h"
 #include "web_server.h"
 
+/* ------------------------------------------------------------------ */
+/* Canal de commande hôte → tare (Output Report HID « dual-rumble »)    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * @brief Ordre de rumble reçu de l'hôte (tâche NimBLE — rester léger).
+ *
+ * Toute magnitude non nulle (Web Gamepad API / WebHID / script hidapi)
+ * demande le recentrage du point 0 de la tête sans passer par le Wi-Fi.
+ * La tare elle-même est exécutée par la tâche manette 100 Hz.
+ */
+static void _onRumbleOrder(uint8_t strongMagnitude, uint8_t weakMagnitude,
+                            uint16_t durationMs) {
+    (void)strongMagnitude;
+    (void)weakMagnitude;
+    (void)durationMs;
+    g_headTracker.requestTare();
+}
+
 void setup() {
     Serial.begin(115200);
     delay(1000);   /* USB Serial/JTAG : laisse le temps au port de s'ouvrir */
@@ -36,6 +55,11 @@ void setup() {
 
     /* 4. Manette BLE HID : services HID + advertising « BOB BL AR » */
     g_bleGamepad.begin();
+
+    /* 4bis. Tare par retour de force : l'ordre de rumble de l'hôte (HID
+              Output Report) recentre le point 0 — canal natif BLE, sans
+              Wi-Fi (cf. docs/TARE_FORCE_FEEDBACK.md). */
+    g_bleGamepad.setRumbleHandler(_onRumbleOrder);
 
     /* 5. Tâche temps réel 100 Hz : lecture IMU → fusion Mahony → mapping
           → jerk → rapport BLE HID (priorité 4, au-dessus du serveur web) */

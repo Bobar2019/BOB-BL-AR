@@ -203,6 +203,17 @@ void HeadTracker::_taskLoop() {
     for (;;) {
         vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(GAMEPAD_PERIOD_MS));
 
+        /* 0. Tare demandée depuis le callback BLE (ordre de rumble, cf.
+              docs/TARE_FORCE_FEEDBACK.md) : exécutée ICI, dans le contexte
+              de la tâche manette — jamais dans le callback NimBLE, où une
+              écriture NVS est proscrite (pile limitée). Le rapport d'entrée
+              suivant repart donc des angles recentrés (≤ 10 ms + intervalle
+              de notification BLE). */
+        if (_tareRequested) {
+            _tareRequested = false;
+            tare();
+        }
+
         if (!_imuOk) {
             /* Capteur absent : télémétrie d'état uniquement */
             if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(2)) == pdTRUE) {
