@@ -1,0 +1,8 @@
+# BOB BL AR — ESP32-C6 DevKit N8 (8 Mo)
+# App 5 Mo (WiFi + NimBLE + AsyncWebServer) + LittleFS ~3 Mo (interface web)
+# Schéma standard Espressif : nvs 20 Ko + otadata 8 Ko, app alignée 0x10000
+# Name,   Type, SubType,  Offset,   Size,     Flags
+nvs,      data, nvs,      0x9000,   0x5000,
+otadata,  data, ota,      0xe000,   0x2000,
+app0,     app,  factory,  0x10000,  0x500000,
+spiffs,   data, spiffs,   0x510000, 0x2f0000,

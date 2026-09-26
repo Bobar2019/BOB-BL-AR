@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#131417">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="BOB BL AR">
+    <title>BOB BL AR — Manette tête</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23131417'/><text y='68' x='50' font-family='Arial' font-size='34' font-weight='bold' fill='%2300d9ff' text-anchor='middle'>BB</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Source+Code+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        /* Thème sombre par défaut ; préférence mémorisée appliquée AVANT le
+           premier rendu pour éviter tout flash de thème au chargement. */
+        (function () {
+            var t = 'dark';
+            try { t = localStorage.getItem('bobblar_theme') || 'dark'; } catch (_) {}
+            document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
+        })();
+    </script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Barre de statut fixe : logo + badges live + bascule de thème -->
+    <header id="topbar">
+        <div class="logo">BOB BL AR</div>
+        <div class="topbar-right">
+            <div class="status-badges">
+                <span id="badge-ble" class="badge badge-off">BLE: …</span>
+                <span id="badge-imu" class="badge badge-off">IMU: …</span>
+                <span id="badge-ws" class="badge badge-off">WS: Déconnecté</span>
+            </div>
+            <button id="theme-toggle" class="theme-toggle" type="button"
+                    aria-label="Passer au thème clair" title="Passer au thème clair">
+                <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="4"/>
+                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+                </svg>
+                <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- ===== VUE DASHBOARD (tuiles) ===== -->
+    <main id="dashboard" class="index-container">
+        <header class="index-header">
+            <h1>TABLEAU DE BORD</h1>
+            <p>Manette de jeu Bluetooth pilotée par les mouvements de tête</p>
+        </header>
+
+        <!-- Barre d'édition drag & drop des tuiles -->
+        <div class="dash-edit-bar">
+            <button id="btnEditDash" class="dash-edit-btn" type="button">
+                <span>Réorganiser</span>
+            </button>
+            <button id="btnSaveDash" class="dash-edit-btn dash-edit-save" type="button" style="display:none">
+                <span>Terminer</span>
+            </button>
+        </div>
+
+        <!-- Grille de tuiles : UNE tuile = UNE section SPA -->
+        <nav class="nav-grid" id="nav-grid">
+            <a class="nav-tile" data-tile-id="gamepad" href="#section-gamepad">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 12h4M8 10v4"/>
+                    <circle cx="15.5" cy="10" r="0.5" fill="currentColor"/>
+                    <circle cx="17.5" cy="12" r="0.5" fill="currentColor"/>
+                    <circle cx="16.5" cy="14" r="0.5" fill="currentColor"/>
+                    <path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.44 2-.9l1.463-1.397a3 3 0 0 1 2.074-.803h4.926a3 3 0 0 1 2.074.803L19 18.1c.5.46 1 1.9 2 1.9a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/>
+                </svg>
+                <span>Manette</span>
+            </a>
+            <a class="nav-tile" data-tile-id="wifi" href="#section-wifi">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 13a10 10 0 0 1 14 0"/>
+                    <path d="M8.5 16.5a5 5 0 0 1 7 0"/>
+                    <path d="M2 8.82a15 15 0 0 1 20 0"/>
+                    <line x1="12" y1="20" x2="12.01" y2="20"/>
+                </svg>
+                <span>Wi-Fi</span>
+            </a>
+            <a class="nav-tile" data-tile-id="system" href="#section-system">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="4" width="16" height="16" rx="2"/>
+                    <rect x="9" y="9" width="6" height="6"/>
+                    <path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/>
+                </svg>
+                <span>Système</span>
+            </a>
+        </nav>
+    </main>
+
+    <!-- ===== SECTION MANETTE ===== -->
+    <section id="section-gamepad" class="section-panel page-container" style="display:none">
+        <h2>Manette BLE</h2>
+
+        <div class="card">
+            <h3>État Bluetooth</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">État</span>
+                    <span class="info-value" id="ble-state">En advertising</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Appareil</span>
+                    <span class="info-value" id="ble-name">BOB BL AR</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Hôtes connectés</span>
+                    <span class="info-value" id="ble-clients">0</span>
+                </div>
+            </div>
+            <p class="hint">Appairez « BOB BL AR » dans Réglages Système → Bluetooth (macOS)
+            ou Périphériques → Bluetooth (Windows). Aucun code requis : appairage sécurisé
+            « Just Works » avec mémorisation (bonding).</p>
+        </div>
+
+        <div class="card">
+            <h3>Télémétrie temps réel</h3>
+            <div class="tele-angles">
+                <div class="readout">
+                    <span class="readout-label">Lacet (yaw)</span>
+                    <span class="readout-value"><span id="tl-yaw">0.0</span>°</span>
+                </div>
+                <div class="readout">
+                    <span class="readout-label">Tangage (pitch)</span>
+                    <span class="readout-value"><span id="tl-pitch">0.0</span>°</span>
+                </div>
+                <div class="readout">
+                    <span class="readout-label">Roulis (roll)</span>
+                    <span class="readout-value"><span id="tl-roll">0.0</span>°</span>
+                </div>
+            </div>
+
+            <div class="tele-joys">
+                <div class="joy-block">
+                    <div class="joy-wrap">
+                        <div class="joy-cross-h"></div>
+                        <div class="joy-cross-v"></div>
+                        <div class="joy-dot" id="joy1-dot"></div>
+                    </div>
+                    <div class="joy-caption">Joystick 1<br><small>Roulis → X · Tangage → Y</small></div>
+                    <div class="joy-vals">X <span id="tl-j1x">0</span> · Y <span id="tl-j1y">0</span></div>
+                </div>
+                <div class="joy-block">
+                    <div class="joy-wrap">
+                        <div class="joy-cross-h"></div>
+                        <div class="joy-cross-v"></div>
+                        <div class="joy-dot joy-dot-z" id="joy2-dot"></div>
+                    </div>
+                    <div class="joy-caption">Joystick 2<br><small>Lacet → Z</small></div>
+                    <div class="joy-vals">Z <span id="tl-j2z">0</span></div>
+                </div>
+            </div>
+
+            <div class="accel-block">
+                <div class="accel-header">
+                    <span>Accélération linéaire</span>
+                    <span><span id="tl-lin">0.0</span> m/s²</span>
+                </div>
+                <div class="accel-bar">
+                    <div class="accel-fill" id="lin-bar"></div>
+                    <div class="accel-th" id="lin-th"></div>
+                </div>
+                <div class="accel-legend">seuil jerk (Bouton 1) : <span id="tl-th">—</span> m/s²</div>
+            </div>
+
+            <div class="btn-indicator-block">
+                <div class="btn-led-wrap">
+                    <div class="btn-led" id="btn1-led"></div>
+                    <span>Bouton 1 — coup de tête sec</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Réglages</h3>
+            <div class="settings-grid">
+                <label>Zone morte — Tangage (°)
+                    <input type="number" id="in-dz-pitch" min="0" max="45" step="0.5" inputmode="decimal">
+                </label>
+                <label>Zone morte — Roulis (°)
+                    <input type="number" id="in-dz-roll" min="0" max="45" step="0.5" inputmode="decimal">
+                </label>
+                <label>Zone morte — Lacet (°)
+                    <input type="number" id="in-dz-yaw" min="0" max="45" step="0.5" inputmode="decimal">
+                </label>
+                <label>Sensibilité — Tangage (°)
+                    <input type="number" id="in-full-pitch" min="10" max="90" step="1" inputmode="decimal">
+                </label>
+                <label>Sensibilité — Roulis (°)
+                    <input type="number" id="in-full-roll" min="10" max="90" step="1" inputmode="decimal">
+                </label>
+                <label>Sensibilité — Lacet (°)
+                    <input type="number" id="in-full-yaw" min="10" max="90" step="1" inputmode="decimal">
+                </label>
+                <label>Seuil jerk — Bouton 1 (m/s²)
+                    <input type="number" id="in-jerk" min="3" max="60" step="0.5" inputmode="decimal">
+                </label>
+                <label>Recharge jerk (ms)
+                    <input type="number" id="in-cool" min="100" max="3000" step="50" inputmode="numeric">
+                </label>
+            </div>
+            <div class="check-grid">
+                <label class="check-label"><input type="checkbox" id="ck-inv-x"> Inverser X (roulis)</label>
+                <label class="check-label"><input type="checkbox" id="ck-inv-y"> Inverser Y (tangage)</label>
+                <label class="check-label"><input type="checkbox" id="ck-inv-z"> Inverser Z (lacet)</label>
+            </div>
+            <p class="hint">Sensibilités : angle de la tête provoquant la pleine déviation du joystick
+            (±127), réglable indépendamment pour chaque axe. Plus la valeur est petite, plus l'axe
+            est réactif. Les zones mortes suppriment le jitter quand la tête est immobile.</p>
+            <div class="form-actions">
+                <button class="btn btn-primary" id="btn-gp-save" type="button">Enregistrer (NVS)</button>
+                <button class="btn btn-success" id="btn-gp-tare" type="button">Recalibrer (tare)</button>
+            </div>
+            <div class="form-status" id="gp-status" role="status"></div>
+        </div>
+    </section>
+
+    <!-- ===== SECTION WI-FI ===== -->
+    <section id="section-wifi" class="section-panel page-container" style="display:none">
+        <h2>Connexion Wi-Fi</h2>
+        <div class="card">
+            <h3>Réseaux à portée</h3>
+            <div class="form-actions">
+                <button id="btn-wifi-scan" class="btn btn-primary" type="button">Scanner</button>
+            </div>
+            <div id="wifi-list" class="wifi-list" aria-live="polite"></div>
+            <div id="wifi-pass-row" style="display:none">
+                <div class="settings-grid">
+                    <label>Mot de passe — <span id="wifi-ssid-label"></span>
+                        <input type="password" id="in-wifi-pass" autocomplete="off">
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button id="btn-wifi-connect" class="btn btn-primary" type="button">Connecter</button>
+                </div>
+            </div>
+            <div class="form-status" id="wifi-status" role="status"></div>
+        </div>
+        <div class="card">
+            <h3>Point d'accès</h3>
+            <p class="hint">L'appareil diffuse son propre réseau « BOB BL AR » (mot de passe
+            <code>bobblar2026</code>) à l'adresse <code>http://192.168.4.1</code> — le portail
+            s'ouvre automatiquement à la connexion. Le réseau client ci-dessus est optionnel.</p>
+        </div>
+    </section>
+
+    <!-- ===== SECTION SYSTÈME ===== -->
+    <section id="section-system" class="section-panel page-container" style="display:none">
+        <h2>Système</h2>
+        <div class="card">
+            <h3>Informations</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Version</span>
+                    <span class="info-value" id="sys-version">—</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Uptime</span>
+                    <span class="info-value" id="sys-uptime">—</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Mémoire libre</span>
+                    <span class="info-value" id="sys-heap">—</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Point d'accès</span>
+                    <span class="info-value" id="sys-apip">—</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Réseau client</span>
+                    <span class="info-value" id="sys-staip">—</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Capteur MPU9250</span>
+                    <span class="info-value" id="sys-imu">—</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Bluetooth</span>
+                    <span class="info-value" id="sys-ble">—</span>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button id="btn-restart" class="btn btn-danger" type="button">Redémarrer</button>
+            </div>
+            <div class="form-status" id="sys-status" role="status"></div>
+        </div>
+    </section>
+
+    <!-- Bouton retour flottant (visible hors dashboard) -->
+    <a id="btn-back" class="back-top-btn" href="#" aria-label="Retour au tableau de bord">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>
+        </svg>
+    </a>
+
+    <!-- Pied de page : version Git dynamique + mentions -->
+    <footer class="app-footer">
+        <span>BOB BL AR <span id="app-version">v0.0.0</span></span>
+        <span aria-hidden="true"> | </span>
+        <span>Auteur : BOB</span>
+        <span aria-hidden="true"> | </span>
+        <span>Licence MIT</span>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
